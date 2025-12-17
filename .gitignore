@@ -1,0 +1,24 @@
+# Node
+backend/node_modules/
+frontend/node_modules/
+frontend/build/
+backend/.env
+frontend/.env
+
+# Models
+backend/model/
+*.h5
+*.pth
+*.pkl
+*.pt
+*.bin
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
