@@ -433,6 +433,43 @@ body {
   border-radius: 6px;
 }
 
+.detailed-scores {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-label {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.score-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.score-value.real {
+  color: #27ae60;
+}
+
+.score-value.fake {
+  color: #e74c3c;
+}
+
 .result-description {
   margin-top: 1.5rem;
   color: #666;

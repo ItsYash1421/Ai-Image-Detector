@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import axios from 'axios';
 import './App.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const MAX_FILE_SIZE = parseInt(process.env.REACT_APP_MAX_FILE_SIZE) || 10485760;
+const BYTEZ_API_KEY = '684766263bb6ce0e175b3d4fa88b401a';
+const MAX_FILE_SIZE = 10485760; // 10MB
 
 function App() {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -61,6 +60,19 @@ function App() {
     }
   };
 
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        // Remove the data:image/...;base64, prefix
+        const base64String = reader.result.split(',')[1];
+        resolve(base64String);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleSubmit = async () => {
     if (!selectedImage) {
       setError('Please select an image first');
@@ -70,16 +82,66 @@ function App() {
     setLoading(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append('image', selectedImage);
-
     try {
-      const response = await axios.post(`${API_URL}/api/predict`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // Convert image to base64
+      const base64Image = await convertToBase64(selectedImage);
+
+      // Call Bytez API directly
+      const response = await fetch('https://api.bytez.com/v1/models/mahsharyahan/vit-ai-detection/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${BYTEZ_API_KEY}`
+        },
+        body: JSON.stringify({
+          input: base64Image
+        })
       });
-      setResult(response.data);
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Check for errors in response
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Parse the output
+      // Expected format: [{'label': 'real', 'score': 0.98}, {'label': 'fake', 'score': 0.02}]
+      const output = data.output || data;
+      
+      let real_score = 0;
+      let fake_score = 0;
+      
+      if (Array.isArray(output)) {
+        for (const item of output) {
+          if (item.label === 'real') {
+            real_score = item.score;
+          } else if (item.label === 'fake') {
+            fake_score = item.score;
+          }
+        }
+      }
+      
+      // Determine prediction
+      const is_real = real_score > fake_score;
+      const prediction = is_real ? 'real' : 'synthetic';
+      const confidence = is_real ? real_score : fake_score;
+      
+      setResult({
+        prediction: prediction,
+        confidence: confidence,
+        real_score: real_score,
+        fake_score: fake_score,
+        raw_output: output
+      });
+
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to analyze image. Please try again.');
+      console.error('Error:', err);
+      setError(err.message || 'Failed to analyze image. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -193,7 +255,7 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <span>🔍</span>
+                    <span>�</span>
                     Analyze Image
                   </>
                 )}
@@ -218,7 +280,7 @@ function App() {
                     <div className="prediction">
                       <span className="label">Classification:</span>
                       <span className={`value ${result.prediction}`}>
-                        {result.prediction === 'synthetic' ? 'AI-Generated (Synthetic)' : 'Real Image'}
+                        {result.prediction === 'synthetic' ? 'AI-Generated (Fake)' : 'Real Image'}
                       </span>
                     </div>
                     <div className="confidence">
@@ -231,10 +293,25 @@ function App() {
                         style={{ width: `${result.confidence * 100}%` }}
                       ></div>
                     </div>
+                    
+                    {/* Detailed Scores */}
+                    {result.real_score !== undefined && result.fake_score !== undefined && (
+                      <div className="detailed-scores">
+                        <div className="score-item">
+                          <span className="score-label">Real Score:</span>
+                          <span className="score-value real">{(result.real_score * 100).toFixed(2)}%</span>
+                        </div>
+                        <div className="score-item">
+                          <span className="score-label">Fake Score:</span>
+                          <span className="score-value fake">{(result.fake_score * 100).toFixed(2)}%</span>
+                        </div>
+                      </div>
+                    )}
+                    
                     <p className="result-description">
                       {result.prediction === 'synthetic' 
-                        ? 'This image appears to be generated by artificial intelligence.'
-                        : 'This image appears to be a real photograph.'}
+                        ? 'This image appears to be generated by artificial intelligence or manipulated.'
+                        : 'This image appears to be a genuine, unaltered photograph.'}
                     </p>
                   </div>
                 </div>
